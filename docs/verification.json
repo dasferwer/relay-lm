@@ -63,5 +63,5 @@
     "duplicate_generation_rejected": 409,
     "elapsed_seconds": 90.77
   },
-  "remote_ci": "not run; local repositories have not been published"
+  "remote_ci": "Not part of this local verification. Current runs: https://github.com/dasferwer/relay-lm/actions"
 }
