@@ -1,0 +1,92 @@
+name: 18-relay-lm
+x-app: &app
+  build:
+    context: .
+    target: runtime
+  environment: &environment
+    DATABASE_URL: postgresql+asyncpg://relaylm:relaylm@database:5432/relaylm
+    JWT_SECRET: ${JWT_SECRET:-local-demo-relaylm-replace-before-deployment}
+  restart: unless-stopped
+  init: true
+services:
+  database:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: relaylm
+      POSTGRES_USER: relaylm
+      POSTGRES_PASSWORD: relaylm
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U relaylm -d relaylm"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+  migrate:
+    <<: *app
+    command: ["sh", "-c", "alembic upgrade head && python scripts/seed.py"]
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: "no"
+  api:
+    <<: *app
+    ports:
+      - "127.0.0.1:8180:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  provider-a:
+    <<: *app
+    command: ["uvicorn", "scripts.mock_provider:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports: ["127.0.0.1:8181:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  provider-b:
+    <<: *app
+    command: ["uvicorn", "scripts.mock_provider:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports: ["127.0.0.1:8182:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  test-db:
+    image: postgres:17-alpine
+    profiles: ["test"]
+    environment:
+      POSTGRES_DB: relaylm_test
+      POSTGRES_USER: relaylm
+      POSTGRES_PASSWORD: relaylm
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U relaylm -d relaylm_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  test:
+    build:
+      context: .
+      target: test
+    profiles: ["test"]
+    environment:
+      <<: *environment
+      DATABASE_URL: postgresql+asyncpg://relaylm:relaylm@test-db:5432/relaylm_test
+      TESTING: "true"
+    depends_on:
+      test-db:
+        condition: service_healthy
+    init: true
+volumes:
+  postgres_data:

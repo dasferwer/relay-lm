@@ -1,0 +1,67 @@
+{
+  "verified_at_utc": "2026-09-11T14:53:22.798448+00:00",
+  "project": "relaylm",
+  "host": {
+    "system": "Darwin",
+    "architecture": "arm64"
+  },
+  "pytest_passed": 24,
+  "ruff_check": "passed",
+  "ruff_format": "passed",
+  "compose_config": "passed",
+  "seed_twice_preserves_existing_records": true,
+  "runtime": {
+    "uid": 999,
+    "python": "3.12.14",
+    "architecture": "aarch64",
+    "modules": {
+      "pytest": false,
+      "ruff": false
+    }
+  },
+  "health": {
+    "status": "ok"
+  },
+  "services": [
+    {
+      "service": "api",
+      "state": "running",
+      "health": "healthy"
+    },
+    {
+      "service": "database",
+      "state": "running",
+      "health": "healthy"
+    },
+    {
+      "service": "provider-a",
+      "state": "running",
+      "health": "healthy"
+    },
+    {
+      "service": "provider-b",
+      "state": "running",
+      "health": "healthy"
+    }
+  ],
+  "openapi_matches_local_app": true,
+  "openapi_sha256": "960091ecbdb06f96c2d0b5f599026d54e942f7495a0095911ca8c74a94712883",
+  "metrics_endpoint": "passed",
+  "smoke": {
+    "ok": true,
+    "fallback": "backup",
+    "client_cancelled": "upstream closed",
+    "budget_rejected": 402,
+    "reserved_after_cancel": 0
+  },
+  "recovery": {
+    "ok": true,
+    "fault": "SIGKILL api during SSE",
+    "status": "abandoned",
+    "charged_started_attempts": 1,
+    "reserved_after_recovery": 0,
+    "duplicate_generation_rejected": 409,
+    "elapsed_seconds": 90.77
+  },
+  "remote_ci": "not run; local repositories have not been published"
+}

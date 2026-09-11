@@ -1,0 +1,5 @@
+# Файл providers.env создаёт владелец; его содержимое не должно попадать в Git.
+services:
+  api:
+    env_file:
+      - providers.env
