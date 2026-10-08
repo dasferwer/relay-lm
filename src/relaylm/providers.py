@@ -10,6 +10,27 @@ class ProviderError(Exception):
         self.rejected = rejected
 
 
+def object_value(value):
+    if not isinstance(value, dict):
+        raise ValueError("Expected object")
+    return value
+
+
+def token_count(value):
+    # Счётчики хранятся в PostgreSQL integer; повреждённый usage
+    # отклоняется в адаптере до попытки записи в ledger.
+    if type(value) is not int or not 0 <= value <= 2147483647:
+        raise ValueError("Expected token count within PostgreSQL integer range")
+    return value
+
+
+def string_value(value):
+    if not isinstance(value, str):
+        raise ValueError("Expected string")
+    value.encode("utf-8")
+    return value
+
+
 async def sse_events(response):
     data = []
     size = 0
@@ -79,35 +100,56 @@ async def stream(client, provider, body):
                 finished = True
                 break
             try:
-                event = json.loads(raw)
+                event = object_value(json.loads(raw))
                 if event.get("error") or event.get("type") == "error":
                     raise ProviderError("upstream_stream_error")
                 if provider.protocol == "openai":
-                    if event.get("usage"):
-                        u = event["usage"]
-                        usage = (int(u["prompt_tokens"]), int(u["completion_tokens"]))
-                        final_usage = True
-                    for choice in event.get("choices", []):
-                        content = choice.get("delta", {}).get("content")
-                        if content:
-                            yield {"type": "delta", "text": content}
-                else:
-                    kind = event.get("type")
-                    if kind == "message_start":
-                        u = event["message"]["usage"]
+                    if event.get("usage") is not None:
+                        u = object_value(event["usage"])
                         usage = (
-                            int(u["input_tokens"])
-                            + int(u.get("cache_creation_input_tokens", 0))
-                            + int(u.get("cache_read_input_tokens", 0)),
-                            int(u["output_tokens"]),
+                            token_count(u["prompt_tokens"]),
+                            token_count(u["completion_tokens"]),
                         )
-                    elif (
-                        kind == "content_block_delta" and event["delta"].get("type") == "text_delta"
-                    ):
-                        yield {"type": "delta", "text": event["delta"]["text"]}
+                        final_usage = True
+                    choices = event.get("choices", [])
+                    if not isinstance(choices, list):
+                        raise ValueError("Expected choices array")
+                    texts = []
+                    for choice in choices:
+                        delta = object_value(object_value(choice).get("delta", {}))
+                        content = delta.get("content")
+                        if content is not None:
+                            content = string_value(content)
+                            if content:
+                                texts.append(content)
+                    # Проверяем всё событие до первого yield: повреждённый choice
+                    # не должен частично выдать текст и закрыть возможность fallback.
+                    for content in texts:
+                        yield {"type": "delta", "text": content}
+                else:
+                    kind = string_value(event.get("type"))
+                    if kind == "message_start":
+                        u = object_value(object_value(event["message"])["usage"])
+                        usage = (
+                            token_count(
+                                token_count(u["input_tokens"])
+                                + token_count(u.get("cache_creation_input_tokens", 0))
+                                + token_count(u.get("cache_read_input_tokens", 0))
+                            ),
+                            token_count(u["output_tokens"]),
+                        )
+                    elif kind == "content_block_delta":
+                        delta = object_value(event["delta"])
+                        if string_value(delta.get("type")) == "text_delta":
+                            content = string_value(delta["text"])
+                            if content:
+                                yield {"type": "delta", "text": content}
                     elif kind == "message_delta" and "usage" in event:
                         # Anthropic передаёт накопленный output_tokens; складывать такие события нельзя.
-                        usage = (usage[0], int(event["usage"]["output_tokens"]))
+                        if usage is None:
+                            raise ValueError("Missing message_start usage")
+                        u = object_value(event["usage"])
+                        usage = (usage[0], token_count(u["output_tokens"]))
                         final_usage = True
                     elif kind == "message_stop":
                         finished = True

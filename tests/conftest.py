@@ -116,6 +116,8 @@ async def upstream():
                 for chunk in chunks
                 if b"message_delta" not in chunk and b"prompt_tokens" not in chunk
             ]
+        if isinstance(mode, list):
+            chunks = mode
         stream = ByteStream(chunks)
         state["streams"].append(stream)
         return httpx.Response(200, headers={"Content-Type": "text/event-stream"}, stream=stream)

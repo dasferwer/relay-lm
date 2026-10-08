@@ -1,5 +1,23 @@
 # Проверки relaylm
 
+## Этап G: структура SSE
+
+Дополнительные регрессии проверяют OpenAI и Anthropic через настоящий ASGI API
+и отдельную PostgreSQL: неверные root/choice/delta/content/usage до и после текста,
+включая bool, дробные, отрицательные и выходящие за диапазон БД счётчики.
+Проверяются fallback, отсутствие смешивания моделей, `usage`/`done` при успехе,
+`error` при позднем повреждении, консервативный расход, освобождение резервов,
+состояние circuit breaker, закрытие upstream и следующий запрос.
+Проверка всех choices выполняется до первого yield одного события.
+
+Разрешены OpenAI `usage: null`, `content: null`, пустой текст и role-only delta.
+Неизвестные строковые типы событий Anthropic игнорируются; output_tokens остаётся
+накопленным счётчиком. Форматы сверены с [OpenAI](https://developers.openai.com/api/reference/resources/chat)
+и [Anthropic](https://platform.claude.com/docs/en/build-with-claude/streaming).
+Upstream в тестах — httpx MockTransport, живые платные API не вызываются.
+
+## Исходный прогон
+
 Дата прогона UTC: `2026-09-11T14:53:22.798448+00:00`. Полные результаты и параметры окружения: [verification.json](verification.json).
 
 | Проверка | Результат |
